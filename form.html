@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      /* ベース設定 */
+      :root{
+        --fz-base:20px;         /* 本文サイズ（モバイル用） */
+        --fz-label:18px;        /* ラベル文字 */
+        --control-h:54px;       /* 入力UIの高さ */
+        --radius:12px;          /* 角丸 */
+        --gap:20px;             /* フィールド間隔 */
+      }
+      @media (min-width:800px){
+        :root{ --fz-base:18px; --fz-label:16px; --control-h:50px; }
+      }
+
+      html,body{
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: var(--fz-base);
+        line-height: 1.7;
+        margin: 0;
+        padding: 20px 22px;
+        color: #111;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      h2{
+        font-size: calc(var(--fz-base) + 6px);
+        font-weight: 700;
+        margin: 0 0 10px;
+      }
+
+      .muted{
+        color:#666;
+        font-size: calc(var(--fz-base) * 0.9);
+      }
+
+      .field{
+        margin-bottom: var(--gap);
+        max-width: 720px;
+      }
+
+      label{
+        display:block;
+        font-weight: 600;
+        font-size: var(--fz-label);
+        margin-bottom: 6px;
+      }
+
+      select, input[type="file"], button{
+        width: 100%;
+        font-size: var(--fz-base);
+        height: var(--control-h);
+        padding: 12px 14px;
+        border: 1px solid #cfd4d9;
+        border-radius: var(--radius);
+        box-sizing: border-box;
+        background: #fff;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      select{
+        background-image:
+          linear-gradient(45deg, transparent 50%, #666 50%),
+          linear-gradient(135deg, #666 50%, transparent 50%);
+        background-position: right 16px top 50%, right 10px top 50%;
+        background-size: 6px 6px, 6px 6px;
+        background-repeat: no-repeat;
+        padding-right: 38px;
+      }
+
+      input[type="file"]{
+        padding: 12px 14px;
+      }
+
+      button{
+        background: #1a73e8;
+        color: #fff;
+        border: none;
+        font-weight: 700;
+        letter-spacing: .02em;
+        box-shadow: 0 1px 2px rgba(0,0,0,.06);
+      }
+      button:disabled{ opacity: .6; }
+
+      .status{ margin-top: 18px; max-width: 720px; font-size: var(--fz-base); }
+      .item{
+        padding: 12px 14px;
+        border: 1px solid #e6e9ec;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        background: #fff;
+      }
+      .ok{ font-weight: 700; }
+      .err{ color:#b00020; font-weight:700; }
+
+      .spinner{
+        display:inline-block;width:18px;height:18px;border:2px solid #cfd4d9;
+        border-top-color:#333;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;
+      }
+      @keyframes spin{ to{ transform: rotate(360deg); } }
+
+      a{ touch-action: manipulation; }
+    </style>
+    <style>
+        * { 
+          margin: 0; padding: 0; 
+          box-sizing: border-box;
+        }
+        html {
+          height: 100%;
+          width: 100%;
+        }
+        body{
+          position: absolute;
+          transform-origin: top left;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
+  </head>
+  <body>
+    <script>
+        window.onload = function(){
+          var scale = 1 / 0.4;
+          document.body.style.width = 100/scale+"%";
+          document.body.style.height = 100/scale+"%";
+          document.body.style.transform = "scale("+scale+")";
+        };
+        window.resize = function(){
+          var scale = 1 / 0.4;
+          document.body.style.width = 100/scale+"%";
+          document.body.style.height = 100/scale+"%";
+          document.body.style.transform = "scale("+scale+")";
+        };
+    </script>
+    <h2>掲示板写真アップロード</h2>
+    <p class="muted">都道府県と市区町村を選び、写真をアップロードしてください。同時に複数指定できます。</p>
+<!--    
+    <p class="muted">写真に記録される位置情報の確認方法<br>
+    iOS: 写真アプリで写真を開き、「i」マークを押します。地図や住所が出れば位置情報がついています。<br>
+    Android: Googleフォトで写真を開き、「i」マーク（情報）を押します。地図や場所が出れば位置情報がついています。<br>
+    ※スマホの「位置情報を含めない」設定になっていると位置情報は保存されません。</p>
+-->
+    <div class="field">
+      <label for="prefecture">都道府県</label>
+      <select id="prefecture" onchange="loadCities()">
+        <option>読み込み中...</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="city">市区町村</label>
+      <select id="city">
+        <option value="">都道府県を先に選んでください</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="boardNo">掲示板番号（例: 4-12）</label>
+      <input id="boardNo" type="text" inputmode="text" placeholder="例: 4-12">
+    </div>
+
+    <div class="field">
+      <label for="comment">コメント（脚立が必要 等）</label>
+      <textarea id="comment" rows="2" style="width:100%; padding:12px 14px; border:1px solid #cfd4d9; border-radius:12px; box-sizing:border-box;"></textarea>
+    </div>
+
+    <p class="muted">※掲示板番号、コメントは任意です。複数ファイルを指定した場合も同じ内容が記録されます。</p>
+
+    <div class="field">
+      <label for="files">ファイルを選択（複数可）</label>
+      <input type="file" id="files" multiple accept="image/*,video/*,.heic,.jpg,.jpeg,.png">
+    </div>
+
+    <div class="field">
+      <button id="btnUpload" onclick="uploadFiles()">アップロード</button>
+    </div>
+
+    <div id="summary" class="muted"></div>
+    <div id="status" class="status"></div>
+
+    <script>
+      let locationData = {};
+      const $ = (id) => document.getElementById(id);
+
+      function loadPrefectures() {
+        google.script.run.withSuccessHandler((result) => {
+          locationData = result || {};
+          const prefSel = $('prefecture');
+          prefSel.innerHTML = '<option value="">選択してください</option>';
+          Object.keys(locationData).forEach(pref => {
+            const opt = document.createElement('option');
+            opt.value = pref; opt.textContent = pref;
+            prefSel.appendChild(opt);
+          });
+          $('summary').textContent = '';
+        }).withFailureHandler((e)=>{
+          $('summary').textContent = '選択肢の取得に失敗しました: ' + (e && e.message ? e.message : e);
+        }).getLocationOptions();
+      }
+
+      function loadCities() {
+        const pref = $('prefecture').value;
+        const cities = locationData[pref] || [];
+        const citySel = $('city');
+        citySel.innerHTML = '<option value="">選択してください</option>';
+        cities.forEach(city => {
+          const opt = document.createElement('option');
+          opt.value = city; opt.textContent = city;
+          citySel.appendChild(opt);
+        });
+      }
+
+      // HEIC判定
+      function isHeic(file) {
+        const name = (file.name || '').toLowerCase();
+        return file.type === 'image/heic' || name.endsWith('.heic');
+      }
+
+      // File/Blob -> base64（dataURL）
+      function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = e => resolve(String(e.target.result));
+          r.onerror = reject;
+          r.readAsDataURL(blob);
+        });
+      }
+
+      // EXIFから緯度経度・撮影時刻を抽出（exifr）
+      async function extractExif(fileOrBlob) {
+        try {
+          const d = await exifr.parse(fileOrBlob, { gps: true, tiff: true, ifd0: true, exif: true });
+          if (!d) return {};
+          const lat = d.latitude != null ? d.latitude : undefined;
+          const lng = d.longitude != null ? d.longitude : undefined;
+          // DateTimeOriginal or CreateDate の文字列化
+          const dt = d.DateTimeOriginal || d.CreateDate || d.ModifyDate || null;
+          const takenAt = dt ? new Date(dt).toISOString() : undefined;
+          return { lat, lng, takenAt };
+        } catch(e) {
+          return {};
+        }
+      }
+
+      function setBusy(busy) {
+        $('btnUpload').disabled = busy;
+        $('btnUpload').textContent = busy ? '送信中…' : 'アップロード';
+      }
+
+      function addStatusLine(html) {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = html;
+        document.getElementById('status').prepend(div);
+        return div;              // ← 追加：呼び出し元で中身を更新するため
+      }
+
+      async function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(String(e.target.result));
+          reader.onerror = e => reject(e);
+          reader.readAsDataURL(file); // data:...;base64,XXXX
+        });
+      }
+
+      function shortName(name, max=60) {
+        return name.length > max ? name.slice(0, max-10) + '…' + name.slice(-9) : name;
+      }
+
+      function uploadFiles() {
+        const pref = $('prefecture').value;
+        const city = $('city').value;
+        const boardNo = $('boardNo').value.trim();
+        const comment = $('comment').value.trim();
+        const files = Array.from($('files').files || []);
+        if (!pref || !city || files.length === 0) {
+          alert('都道府県・市区町村・ファイルを選択してください。');
+          return;
+        }
+
+        setBusy(true);
+        $('summary').innerHTML = `<span class="spinner"></span> アップロード準備中…`;
+        $('status').innerHTML = '';
+
+        google.script.run
+          .withSuccessHandler(async (folderId) => {
+            if (!folderId) {
+              setBusy(false);
+              $('summary').textContent = 'アップロード先フォルダが見つかりません。F列URLをご確認ください。';
+              return;
+            }
+            const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
+
+            let ok = 0, ng = 0;
+            $('summary').innerHTML = `<span class="spinner"></span> 送信中… 0 / ${files.length}`;
+
+            for (let i = 0; i < files.length; i++) {
+              let f = files[i];
+
+              // ステータス行（まずファイル名だけ表示）
+              const row = addStatusLine(
+                `解析中 <span class="muted">${shortName(f.name)}</span> <span class="spinner"></span>`
+              );
+
+              try {
+                let exif = await extractExif(f);
+                let locTag = (exif.lat != null && exif.lng != null) ? '📍' : '';
+
+                if (isHeic(f)) {
+                  // HEIC → JPEG
+                  const jpegBlob = await heic2any({ blob: f, toType: 'image/jpeg' });
+                  const uploadName = f.name.replace(/\.heic$/i, '.jpeg').replace(/\.heif$/i, '.jpeg');
+                  const dataUrl = await blobToDataURL(jpegBlob);
+                  const base64 = dataUrl.split(',')[1];
+                  const fileObj = { name: uploadName, mimeType: 'image/jpeg', data: base64 };
+
+                  const res = await new Promise((resolve, reject) => {
+                    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
+                      .uploadSingleFileBase64(pref, city, fileObj, folderId, exif, boardNo, comment);
+                  });
+
+                  ok++;
+                  row.innerHTML = `✅ 完了 <span class="ok">${res.name}</span> ${locTag} — <a href="${res.url}" target="_blank">Driveで開く</a>`;
+                } else {
+                  // JPEG/PNGなど
+                  const dataUrl = await fileToBase64(f);
+                  const base64 = dataUrl.split(',')[1];
+                  const fileObj = { name: f.name, mimeType: f.type || 'application/octet-stream', data: base64 };
+
+                  const res = await new Promise((resolve, reject) => {
+                    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
+                      .uploadSingleFileBase64(pref, city, fileObj, folderId, exif, boardNo, comment);
+                  });
+
+                  ok++;
+                  row.innerHTML = `✅ 完了 <span class="ok">${res.name}</span> ${locTag} — <a href="${res.url}" target="_blank">Driveで開く</a>`;
+                }
+              } catch (e) {
+                ng++;
+                row.innerHTML = `❌ 失敗 <span class="err">${shortName(f.name)}</span> — ${e && e.message ? e.message : e}`;
+              }
+              $('summary').textContent = `送信中… ${ok + ng} / ${files.length}（成功: ${ok}・失敗: ${ng}）`;
+            }
+
+            setBusy(false);
+            // 全件完了＋フォルダを開くリンク
+            $('summary').innerHTML = `完了！ 成功: ${ok}・失敗: ${ng} — <a href="${folderUrl}" target="_blank">フォルダをDriveで開く</a>`;
+
+          })
+          .withFailureHandler((e) => {
+            setBusy(false);
+            $('summary').textContent = 'フォルダ取得に失敗しました: ' + (e && e.message ? e.message : e);
+          })
+          .getUploadFolderId(pref, city);
+      }
+
+      // 初期化
+      loadPrefectures();
+    </script>
+  </body>
+</html>
