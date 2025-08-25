@@ -73,7 +73,7 @@ function getUploadFolderId(pref, city) {
 function ensureLogSheet_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let sh = ss.getSheetByName(LOG_SHEET_NAME);
-  const expected = ['Timestamp','Prefecture','City','Ward','Number','Comment','Filename','File URL','File ID','Latitude','Longitude','TakenAt'];
+  const expected = ['Timestamp','Prefecture','City','Ward','Number','Status','Note','Comment','Filename','File URL','File ID','Latitude','Longitude','TakenAt'];
 
   if (!sh) {
     sh = ss.insertSheet(LOG_SHEET_NAME);
@@ -89,8 +89,6 @@ function ensureLogSheet_() {
     // 4列目に列を差し込み
     sh.insertColumnAfter(3);
   }
-  // ヘッダーを期待形に上書き
-  sh.getRange(1, 1, 1, expected.length).setValues([expected]);
   return sh;
 }
 
