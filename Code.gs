@@ -4,10 +4,28 @@ const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
 
 // スプレッドシート情報
 const SHEET_NAME = '都道府県マスタ';
+const WARD_SHEET_NAME = '行政区マスタ';  // 追加：A=都道府県, B=政令指定都市, C=行政区
 const LOG_SHEET_NAME = 'アップロードログ';
 const COL_PREF = 1; // A列
 const COL_CITY = 2; // B列
 const COL_URL  = 6; // F列
+
+/** 全Wardをまとめて返す: { [pref]: { [city]: [ward, ...] } } */
+function getWardMap() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(WARD_SHEET_NAME);
+  const map = {};
+  if (!sheet) return map;
+  const values = sheet.getDataRange().getValues(); // A:都道府県, B:政令指定都市, C:行政区
+  for (let i = 1; i < values.length; i++) {
+    const [pref, city, ward] = values[i];
+    if (!pref || !city || !ward) continue;
+    if (!map[pref]) map[pref] = {};
+    if (!map[pref][city]) map[pref][city] = [];
+    if (!map[pref][city].includes(ward)) map[pref][city].push(ward);
+  }
+  return map;
+}
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('form')
@@ -55,26 +73,28 @@ function getUploadFolderId(pref, city) {
 function ensureLogSheet_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let sh = ss.getSheetByName(LOG_SHEET_NAME);
+  const expected = ['Timestamp','Prefecture','City','Ward','Number','Comment','Filename','File URL','File ID','Latitude','Longitude','TakenAt'];
+
   if (!sh) {
     sh = ss.insertSheet(LOG_SHEET_NAME);
-    sh.appendRow([
-      'Timestamp','Prefecture','City',
-      'Number','Comment',                // ← 追加
-      'Filename','File URL','File ID',
-      'Latitude','Longitude','TakenAt'
-    ]);
+    sh.appendRow(expected);
     return sh;
   }
-  // 既存シートにも不足カラムがあれば末尾に追加
-  const headers = sh.getRange(1,1,1, sh.getLastColumn()).getValues()[0];
-  const need = ['Number','Comment'].filter(h => headers.indexOf(h) === -1);
-  if (need.length) {
-    sh.getRange(1, sh.getLastColumn()+1, 1, need.length).setValues([need]);
+
+  // 先頭行を確認して “Ward” が無ければ 4列目に追加
+  const lastCol = Math.max(sh.getLastColumn(), expected.length);
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+
+  if (!headers.includes('Ward')) {
+    // 4列目に列を差し込み
+    sh.insertColumnAfter(3);
   }
+  // ヘッダーを期待形に上書き
+  sh.getRange(1, 1, 1, expected.length).setValues([expected]);
   return sh;
 }
 
-function logUpload(pref, city, number, comment, filename, url, id, exif) {
+function logUpload(pref, city, ward, number, comment, filename, url, id, exif) {
   const sh = ensureLogSheet_();
   const headers = sh.getRange(1,1,1, sh.getLastColumn()).getValues()[0];
   const idx = {};
@@ -84,6 +104,7 @@ function logUpload(pref, city, number, comment, filename, url, id, exif) {
   row[idx['Timestamp']] = new Date();
   if ('Prefecture' in idx) row[idx['Prefecture']] = pref;
   if ('City' in idx)       row[idx['City']]       = city;
+  if ('Ward' in idx)       row[idx['Ward']]       = ward || '';
   if ('Number' in idx)     row[idx['Number']]     = number || '';
   if ('Comment' in idx)    row[idx['Comment']]    = comment || '';
   if ('Filename' in idx)   row[idx['Filename']]   = filename;
@@ -103,7 +124,7 @@ function logUpload(pref, city, number, comment, filename, url, id, exif) {
  * @param {string} number 掲示板番号（全ファイル共通）
  * @param {string} comment コメント（全ファイル共通）
  */
-function uploadSingleFileBase64(pref, city, fileObj, folderId, exif, number, comment) {
+function uploadSingleFileBase64(pref, city, ward, fileObj, folderId, exif, number, comment) {
   if (!folderId) throw new Error('Folder ID not found.');
   const bytes = Utilities.base64Decode(fileObj.data);
   const blob = Utilities.newBlob(bytes, fileObj.mimeType || MimeType.BINARY, fileObj.name);
@@ -111,7 +132,7 @@ function uploadSingleFileBase64(pref, city, fileObj, folderId, exif, number, com
   const file = folder.createFile(blob);
   const res = { name: file.getName(), id: file.getId(), url: file.getUrl() };
   // ← ここで番号・コメントも一緒に記録
-  logUpload(pref, city, number, comment, res.name, res.url, res.id, exif);
+  logUpload(pref, city, ward, number, comment, res.name, res.url, res.id, exif);
   return res;
 }
 
