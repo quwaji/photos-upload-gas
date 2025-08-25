@@ -159,6 +159,13 @@
       </select>
     </div>
 
+    <div class="field" id="wardField" style="display:none;">
+      <label for="ward">行政区</label>
+      <select id="ward">
+        <option value="">選択してください</option>
+      </select>
+    </div>
+
     <div class="field">
       <label for="boardNo">掲示板番号（例: 4-12）</label>
       <input id="boardNo" type="text" inputmode="text" placeholder="例: 4-12">
@@ -185,9 +192,13 @@
 
     <script>
       let locationData = {};
+      let wardMap = {};           // ここに全Wardをキャッシュ
+      let wardReady = false;
+
       const $ = (id) => document.getElementById(id);
 
       function loadPrefectures() {
+        // 都道府県・市の取得
         google.script.run.withSuccessHandler((result) => {
           locationData = result || {};
           const prefSel = $('prefecture');
@@ -201,6 +212,11 @@
         }).withFailureHandler((e)=>{
           $('summary').textContent = '選択肢の取得に失敗しました: ' + (e && e.message ? e.message : e);
         }).getLocationOptions();
+
+        // ★ Wardマップを先に全部ロード（以後はクライアントだけで切替）
+        google.script.run
+          .withSuccessHandler((map) => { wardMap = map || {}; wardReady = true; })
+          .getWardMap();
       }
 
       function loadCities() {
@@ -213,6 +229,38 @@
           opt.value = city; opt.textContent = city;
           citySel.appendChild(opt);
         });
+        citySel.onchange = showWardsInstant;
+        // リセット
+        $('ward').innerHTML = '<option value="">選択してください</option>';
+        $('wardField').style.display = 'none';
+      }
+
+      // ★ サーバ呼び出しは不要。キャッシュから即時表示
+      function showWardsInstant() {
+        const pref = $('prefecture').value;
+        const city = $('city').value;
+        const wardSel = $('ward');
+
+        // まだWardマップが未ロードなら「読み込み中」を見せておく
+        if (!wardReady) {
+          wardSel.innerHTML = '<option value="">読み込み中…</option>';
+          $('wardField').style.display = '';
+          return;
+        }
+
+        const wards = (wardMap[pref] && wardMap[pref][city]) ? wardMap[pref][city] : [];
+        if (wards.length) {
+          wardSel.innerHTML = '<option value="">選択してください</option>';
+          wards.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w; opt.textContent = w;
+            wardSel.appendChild(opt);
+          });
+          $('wardField').style.display = '';
+        } else {
+          $('wardField').style.display = 'none';
+          wardSel.innerHTML = '<option value="">選択してください</option>';
+        }
       }
 
       // HEIC判定
@@ -276,6 +324,7 @@
       function uploadFiles() {
         const pref = $('prefecture').value;
         const city = $('city').value;
+        const ward = $('ward').value || '';
         const boardNo = $('boardNo').value.trim();
         const comment = $('comment').value.trim();
         const files = Array.from($('files').files || []);
@@ -322,7 +371,7 @@
 
                   const res = await new Promise((resolve, reject) => {
                     google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
-                      .uploadSingleFileBase64(pref, city, fileObj, folderId, exif, boardNo, comment);
+                      .uploadSingleFileBase64(pref, city, ward, fileObj, folderId, exif, boardNo, comment);
                   });
 
                   ok++;
@@ -335,7 +384,7 @@
 
                   const res = await new Promise((resolve, reject) => {
                     google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
-                      .uploadSingleFileBase64(pref, city, fileObj, folderId, exif, boardNo, comment);
+                      .uploadSingleFileBase64(pref, city, ward, fileObj, folderId, exif, boardNo, comment);
                   });
 
                   ok++;
