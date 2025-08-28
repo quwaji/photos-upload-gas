@@ -104,6 +104,42 @@
       @keyframes spin{ to{ transform: rotate(360deg); } }
 
       a{ touch-action: manipulation; }
+
+      .secondary{
+        background:#f1f3f4; color:#1f1f1f; border:1px solid #d7dbdf;
+      }
+
+      .detail-box{
+        padding:12px 14px; border:1px solid #e6e9ec; border-radius:10px; background:#fff; max-width:720px; margin:8px 0 16px;
+        font-size: calc(var(--fz-base) * 0.95);
+      }
+
+      .guide-img{
+        max-width: 100%; height: auto;
+        border-radius: 10px;
+        display: block;
+        margin: 8px 0 16px;
+      }
+
+      .preview-grid{
+        display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+        gap:12px; max-width: 920px; margin: 6px 0 8px;
+      }
+      .card{
+        border:1px solid #e6e9ec; border-radius:12px; padding:10px; background:#fff;
+      }
+      .thumb{
+        width:100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius:8px; background:#fafafa;
+      }
+      .meta{
+        margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+        font-size: calc(var(--fz-base) * 0.9);
+      }
+      .badge{
+        font-size: .9em; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#1a49e8;
+      }
+      .actions{ display:flex; gap:10px; }
+      .linklike{ color:#1a73e8; text-decoration:underline; cursor:pointer; }
     </style>
     <style>
         * { 
@@ -118,6 +154,11 @@
           position: absolute;
           transform-origin: top left;
         }
+    </style>
+    <style>
+      details { max-width: 720px; margin: 6px 0 16px; }
+      summary { list-style: none; cursor: pointer; }
+      summary::-webkit-details-marker { display: none; } /* iOS/Safariの三角を消す */
     </style>
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
@@ -138,13 +179,33 @@
         };
     </script>
     <h2>掲示板写真アップロード</h2>
-    <p class="muted">都道府県と市区町村を選び、写真をアップロードしてください。同時に複数指定できます。</p>
-<!--    
-    <p class="muted">写真に記録される位置情報の確認方法<br>
-    iOS: 写真アプリで写真を開き、「i」マークを押します。地図や住所が出れば位置情報がついています。<br>
-    Android: Googleフォトで写真を開き、「i」マーク（情報）を押します。地図や場所が出れば位置情報がついています。<br>
-    ※スマホの「位置情報を含めない」設定になっていると位置情報は保存されません。</p>
--->
+
+    <p class="muted">
+      都道府県と市区町村を選び、写真をアップロードしてください。同時に複数指定できます。<br>
+      ※位置情報の記録がない場合も、<strong>掲示板番号が写り周囲の様子が分かる写真</strong>は有用です。ぜひご協力ください。
+    </p>
+
+    <img class="guide-img"
+        src="https://drive.google.com/thumbnail?id=130DswFeKYz4bDD2KXNaRWv5f9bNopDZY&sz=w1600"
+        alt="活用可能／掲示板特定が難しい写真の例"
+        referrerpolicy="no-referrer">
+
+    <details id="detail">
+      <summary class="linklike" id="detailSummary">詳細を表示</summary>
+      <div class="detail-box">
+        <ul>
+          <li>推奨：掲示板全体＋番号が読み取れる距離感（遠景～中景）</li>
+          <li>NG例：番号が見えない超近接／人物の顔が中心／風景のみで掲示板が不明</li>
+          <li>写真に記録される位置情報の確認方法<br>
+            iOS: 写真アプリで写真を開き「i」。地図や住所が出れば位置情報あり。<br>
+            Android: Googleフォトで写真を開き「i」。地図や場所が出れば位置情報あり。<br>
+            ※スマホの「位置情報を含めない」設定になっていると位置情報は記録されません。
+          </li>
+          <li>匿名性：アップロードいただいた写真は誰がアップしたかは特定されません。</li>
+        </ul>
+      </div>
+    </details>
+
     <div class="field">
       <label for="prefecture">都道府県</label>
       <select id="prefecture" onchange="loadCities()">
@@ -407,6 +468,14 @@
             $('summary').textContent = 'フォルダ取得に失敗しました: ' + (e && e.message ? e.message : e);
           })
           .getUploadFolderId(pref, city);
+      }
+      
+      const det = document.getElementById('detail');
+      const sum = document.getElementById('detailSummary');
+      if (det && sum) {
+        det.addEventListener('toggle', () => {
+          sum.textContent = det.open ? '詳細を隠す' : '詳細を表示';
+        });
       }
 
       // 初期化
